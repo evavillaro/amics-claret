@@ -63,6 +63,17 @@ Deno.serve(async (req) => {
         .eq("stripe_subscription_id", sub);
       if (error) { console.error(error.message); return new Response("db", { status: 500 }); }
     }
+  } else if (ev.type === "customer.subscription.updated") {
+    // Cancel·lació des del portal: la subscripció segueix viva fins al final del període, però ja no es renovarà.
+    // Si l'Amic es repensa i la reactiva, torna a 'actiu'.
+    const esCancella = o.cancel_at_period_end === true || o.cancel_at != null;
+    const viva = o.status === "active" || o.status === "trialing";
+    if (viva) {
+      const { error } = await db.from("amics")
+        .update({ estat: esCancella ? "cancellat" : "actiu" })
+        .eq("stripe_subscription_id", o.id).in("estat", ["actiu", "cancellat"]);
+      if (error) { console.error(error.message); return new Response("db", { status: 500 }); }
+    }
   } else if (ev.type === "customer.subscription.deleted") {
     // Baixa: conserva el carnet fins a valid_fins, però ja no es renova
     const { error } = await db.from("amics").update({ estat: "cancellat" }).eq("stripe_subscription_id", o.id);
