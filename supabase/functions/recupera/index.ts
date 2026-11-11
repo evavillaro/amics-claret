@@ -9,10 +9,12 @@ const cors = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 
-// Envia el correu amb l'enllaç del carnet (Brevo). Si no hi ha clau configurada, no fa res.
+// Envia el correu amb l'enllaç del carnet (Resend o Brevo).
 async function enviaCarnet(a: { nom: string; email: string; token: string; num: number }): Promise<boolean> {
-  const key = Deno.env.get("BREVO_API_KEY"); const site = Deno.env.get("SITE_URL");
-  if (!key || !site) return false;
+  const resend = Deno.env.get("RESEND_API_KEY"); const brevo = Deno.env.get("BREVO_API_KEY");
+  const site = Deno.env.get("SITE_URL");
+  const from = Deno.env.get("EMAIL_FROM") ?? "amicsclaret@gmail.com";
+  if ((!resend && !brevo) || !site) { console.error("correu: falta RESEND_API_KEY o BREVO_API_KEY"); return false; }
   const url = `${site}/carnet.html?t=${a.token}`;
   const nom = a.nom.replace(/[<>&"]/g, "");
   const html = `<div style="font-family:Verdana,Arial,sans-serif;max-width:520px;margin:auto;background:#001034;color:#ffffff;padding:28px;border-radius:16px">
@@ -23,17 +25,23 @@ async function enviaCarnet(a: { nom: string; email: string; token: string; num: 
 <p style="text-align:center;margin:26px 0"><a href="${url}" style="background:#f68f16;color:#1a0d00;font-weight:bold;text-decoration:none;padding:14px 26px;border-radius:10px;display:inline-block">Obre el meu carnet</a></p>
 <p style="font-size:13px;color:#c5d4f5">Guarda aquest correu: l'enllaç és personal i no s'ha de compartir. Des del carnet pots gestionar la renovació de la quota quan vulguis.</p>
 <p style="color:#f68f16;font-style:italic;font-weight:bold;text-align:center;font-size:18px;margin:22px 0 0">Amics que sumen.</p></div>`;
-  const r = await fetch("https://api.brevo.com/v3/smtp/email", {
-    method: "POST",
-    headers: { "api-key": key, "Content-Type": "application/json", accept: "application/json" },
-    body: JSON.stringify({
-      sender: { name: "Amics del Bàsquet Claret", email: Deno.env.get("EMAIL_FROM") ?? "amicsclaret@gmail.com" },
-      to: [{ email: a.email, name: a.nom }],
-      subject: "El teu carnet d'Amic del Bàsquet Claret",
-      htmlContent: html,
-    }),
-  });
-  if (!r.ok) console.error("brevo", r.status, (await r.text()).slice(0, 200));
+  const subject = "El teu carnet d'Amic del Bàsquet Claret";
+  // Resend (domini propi verificat) si hi ha clau; si no, Brevo (permet enviar des d'un Gmail verificat)
+  const r = resend
+    ? await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${resend}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: `Amics del Bàsquet Claret <${from}>`, to: [a.email], subject, html }),
+      })
+    : await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: { "api-key": brevo!, "Content-Type": "application/json", accept: "application/json" },
+        body: JSON.stringify({
+          sender: { name: "Amics del Bàsquet Claret", email: from },
+          to: [{ email: a.email, name: a.nom }], subject, htmlContent: html,
+        }),
+      });
+  if (!r.ok) console.error("correu", resend ? "resend" : "brevo", r.status, (await r.text()).slice(0, 300));
   return r.ok;
 }
 
