@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
   const f = new URLSearchParams();
   f.set("customer", a.stripe_customer_id);
   f.set("return_url", `${SITE_URL}/carnet.html?t=${token}`);
-  f.set("locale", "ca");
+  f.set("locale", "es"); // Stripe no té català
   const r = await fetch("https://api.stripe.com/v1/billing_portal/sessions", {
     method: "POST",
     headers: { Authorization: `Bearer ${STRIPE_KEY}`, "Content-Type": "application/x-www-form-urlencoded" },

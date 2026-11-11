@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
   const renov = properaRenovacio();
   const f = new URLSearchParams();
   f.set("mode", "subscription");
-  f.set("locale", "ca");
+  f.set("locale", "es"); // Stripe no té català
   f.set("customer_email", email);
   f.set("client_reference_id", amic.id);
   f.set("success_url", `${SITE_URL}/carnet.html?t=${amic.token}&nou=1`);
