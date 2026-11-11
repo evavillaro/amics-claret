@@ -6,7 +6,13 @@
 <meta name="robots" content="noindex">
 <title>Carnet d'Amic · Bàsquet Claret</title>
 <link rel="icon" href="img/llops.jpg">
-<link rel="apple-touch-icon" href="img/llops.jpg">
+<link rel="apple-touch-icon" href="img/icona-180.png">
+<link rel="manifest" href="carnet.webmanifest">
+<meta name="theme-color" content="#001034">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Amics Claret">
 <link rel="stylesheet" href="estil.css">
 </head>
 <body>
@@ -37,6 +43,12 @@
     <p class="lema" style="margin-top:14px">Amics que sumen.</p>
   </article>
 
+  <section id="instala" class="caixa ocult" style="margin-top:16px" aria-labelledby="t-inst">
+    <h2 id="t-inst" style="margin:0 0 8px; font-size:1.1rem">📲 Tingues el carnet sempre a mà</h2>
+    <p style="margin:0 0 8px">Afegeix-lo a la pantalla d'inici del mòbil i s'obrirà com una app, amb l'escut dels Llops:</p>
+    <ol id="passos" style="margin:0; padding-left:20px"></ol>
+  </section>
+
   <div id="accions" class="ocult">
     <button class="boto sec petita" id="gestiona" type="button">Gestiona</button>
     <p class="error" id="error" role="alert"></p>
@@ -50,7 +62,10 @@
 <script src="js/config.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
-const p = new URLSearchParams(location.search), t = p.get("t") || "";
+const p = new URLSearchParams(location.search);
+// Recorda el carnet en aquest mòbil, per si s'obre sense l'enllaç complet
+let t = p.get("t") || "";
+try { if (t) localStorage.setItem("amics_carnet", t); else t = localStorage.getItem("amics_carnet") || ""; } catch (_) {}
 const dataCat = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("ca-ES", { day: "numeric", month: "long", year: "numeric" });
 
 async function carrega(intents) {
@@ -75,6 +90,20 @@ async function carrega(intents) {
   $("carnet").classList.remove("ocult");
   if (c.estat !== "pendent") $("accions").classList.remove("ocult");
   if (p.has("nou") && c.estat === "actiu") $("benvinguda").classList.remove("ocult");
+  mostraInstala();
+}
+function mostraInstala() {
+  const jaApp = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  if (jaApp) return;
+  const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua), android = /Android/.test(ua);
+  const passos = ios
+    ? ["Obre aquesta pàgina amb Safari.", "Toca el botó Comparteix (el quadrat amb la fletxa cap amunt).", "Tria «Afegeix a la pantalla d'inici»."]
+    : android
+    ? ["Toca el menú ⋮ de dalt a la dreta.", "Tria «Afegeix a la pantalla d'inici» o «Instal·la l'aplicació»."]
+    : ["Obre aquest enllaç al mòbil.", "Al menú del navegador, tria «Afegeix a la pantalla d'inici»."];
+  const ol = $("passos"); ol.innerHTML = "";
+  for (const x of passos) { const li = document.createElement("li"); li.textContent = x; ol.appendChild(li); }
+  $("instala").classList.remove("ocult");
 }
 carrega(p.has("nou") ? 8 : 0);
 
