@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Panell · Amics del Bàsquet Claret</title>
+<link rel="icon" href="img/llops.jpg">
+<link rel="stylesheet" href="estil.css">
+<style>
+  .pagina{max-width:860px}
+  .pestanyes{display:flex; gap:8px; margin:18px 0}
+  .pestanyes button{flex:1; padding:12px; border-radius:10px; border:1.5px solid var(--blau); background:transparent; color:var(--cel); font:inherit; font-weight:700; cursor:pointer}
+  .pestanyes button[aria-selected=true]{background:var(--taronja); color:#1a0d00; border-color:var(--taronja)}
+  .graella{display:grid; grid-template-columns:70px 1fr; gap:10px 12px}
+  .graella .ample{grid-column:1/-1}
+  .dos{display:grid; grid-template-columns:1fr 110px; gap:12px}
+  .caixa + .caixa{margin-top:14px}
+  .caixa label{margin:0 0 4px; font-size:.82rem; color:var(--cel); font-weight:700}
+  .xips{display:flex; flex-wrap:wrap; gap:8px; margin:10px 0}
+  .xip{display:inline-flex; align-items:center; gap:8px; padding:6px 6px 6px 12px; border-radius:999px; background:rgba(110,160,255,.18); font-size:.9rem}
+  .xip button{border:0; background:rgba(255,255,255,.15); color:#fff; border-radius:50%; width:26px; height:26px; cursor:pointer; font-size:1rem; line-height:1}
+  .linia{display:flex; gap:8px; flex-wrap:wrap; align-items:end}
+  .linia > *{flex:1 1 140px}
+  .boto.mini{width:auto; margin:0; padding:10px 16px; font-size:.9rem; flex:0 0 auto}
+  .taula{overflow-x:auto}
+  table{border-collapse:collapse; width:100%; font-size:.9rem}
+  th,td{text-align:left; padding:9px 8px; border-bottom:1px solid rgba(110,160,255,.25); white-space:nowrap}
+  th{color:var(--cel); font-size:.75rem; text-transform:uppercase; letter-spacing:.05em}
+  td.nom{white-space:normal; min-width:140px}
+  .pend{color:var(--taronja); font-weight:700}
+  .fet{color:var(--verd); font-weight:700}
+  .resum{display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px}
+  .resum div{flex:1 1 120px; padding:12px; border-radius:12px; background:rgba(110,160,255,.12)}
+  .resum b{display:block; font-size:1.6rem; font-variant-numeric:tabular-nums}
+  .inactiu{opacity:.6}
+</style>
+</head>
+<body>
+<main class="pagina">
+  <header class="cap">
+    <img src="img/llops.jpg" alt="" style="width:60px">
+    <div><div class="sobre">Panell del club</div><h2 style="margin:0">Amics del Bàsquet Claret</h2></div>
+  </header>
+
+  <form id="fpin" class="caixa" style="margin-top:18px; max-width:360px">
+    <label for="pin">PIN d'administrador</label>
+    <input id="pin" type="password" inputmode="numeric" maxlength="10" autocomplete="off" required>
+    <button class="boto" type="submit">Entra</button>
+    <p class="error" id="epin" role="alert"></p>
+  </form>
+
+  <div id="panell" class="ocult">
+    <div class="pestanyes" role="tablist">
+      <button role="tab" id="t-av" aria-selected="true" aria-controls="p-av">Avantatges</button>
+      <button role="tab" id="t-am" aria-selected="false" aria-controls="p-am">Amics i samarretes</button>
+    </div>
+    <p class="error" id="err" role="alert"></p>
+
+    <section id="p-av" role="tabpanel" aria-labelledby="t-av">
+      <div id="llista-av"></div>
+      <button class="boto sec" id="nou-av" type="button">+ Afegeix un avantatge</button>
+      <p class="petit">Els avantatges actius surten a la web i a la pantalla de validació del bar. Un avantatge amb usos registrats no s'esborra: es desactiva.</p>
+    </section>
+
+    <section id="p-am" role="tabpanel" aria-labelledby="t-am" class="ocult">
+      <div class="resum" id="resum"></div>
+      <div class="linia" style="margin-bottom:12px">
+        <label class="check" style="margin:0"><input type="checkbox" id="nomes-pend"> <span>Només samarretes pendents</span></label>
+        <button class="boto sec mini" id="csv" type="button">Descarrega CSV</button>
+      </div>
+      <div class="caixa taula"><table>
+        <thead><tr><th>Nº</th><th>Nom</th><th>Alta</th><th>Talla</th><th>Estat</th><th id="th-unic">Samarreta</th><th></th></tr></thead>
+        <tbody id="cos-am"></tbody>
+      </table></div>
+      <p class="petit">Ordenats de més nou a més antic.</p>
+    </section>
+
+    <p class="petit centre" style="margin-top:24px"><span id="qui"></span> · <a href="#" id="surt">surt</a></p>
+  </div>
+</main>
+<script src="js/config.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const el = (tag, props = {}, ...fills) => { const e = Object.assign(document.createElement(tag), props); e.append(...fills); return e; };
+const sess = {
+  get() { try { return sessionStorage.getItem("amics_admin") || ""; } catch (_) { return this.v || ""; } },
+  set(v) { this.v = v; try { sessionStorage.setItem("amics_admin", v); } catch (_) {} },
+  clear() { this.v = ""; try { sessionStorage.removeItem("amics_admin"); } catch (_) {} },
+};
+const TIPUS = { per_dia: "Per dia assenyalat", per_temporada: "Per temporada", unic: "Un sol cop (p. ex. samarreta)" };
+const ERRORS = { NOM: "Posa un nom a l'avantatge.", LIMIT: "El límit ha de ser un número entre 1 i 99.", DIA: "Tria una data.", BLOQUEJAT: "Massa intents de PIN. Espera 10 minuts." };
+const dataCurta = (iso) => new Date(iso.slice(0, 10) + "T12:00:00").toLocaleDateString("ca-ES", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+let estat = null;
+
+async function accio(cos) {
+  $("err").textContent = "";
+  const r = await post("admin", { pin: sess.get(), ...cos }).catch(() => ({ ok: false, status: 0, d: {} }));
+  if (r.status === 401 || r.status === 429) {
+    sess.clear(); $("panell").classList.add("ocult"); $("fpin").classList.remove("ocult");
+    $("epin").textContent = r.status === 429 ? ERRORS.BLOQUEJAT : "PIN incorrecte o sense permís d'administrador.";
+    return false;
+  }
+  if (!r.ok) { $("err").textContent = ERRORS[r.d.error] || "No s'ha pogut desar. Torna-ho a provar."; return false; }
+  estat = r.d; pinta(); return true;
+}
+
+function camp(etq, input, classe) { const d = el("div", { className: classe || "" }); const id = "c" + Math.random().toString(36).slice(2); input.id = id; d.append(el("label", { htmlFor: id, textContent: etq }), input); return d; }
+
+function targetaAvantatge(a) {
+  const nou = !a.id;
+  const f = el("form", { className: "caixa" + (a.actiu === false ? " inactiu" : "") });
+  const icona = el("input", { type: "text", value: a.icona || "⭐", maxLength: 8 });
+  const nom = el("input", { type: "text", value: a.nom || "", maxLength: 60, required: true });
+  const desc = el("input", { type: "text", value: a.descripcio || "", maxLength: 160, placeholder: "Text que surt a la web" });
+  const tipus = el("select"); for (const k in TIPUS) tipus.append(el("option", { value: k, textContent: TIPUS[k], selected: a.tipus === k }));
+  const limit = el("input", { type: "text", inputMode: "numeric", value: a.limit_usos || 1 });
+  const actiu = el("input", { type: "checkbox", checked: a.actiu !== false });
+  const g = el("div", { className: "graella" });
+  g.append(camp("Icona", icona), camp("Nom", nom), camp("Descripció", desc, "ample"));
+  const d2 = el("div", { className: "dos ample" }); d2.append(camp("Com es compta", tipus), camp("Límit", limit)); g.append(d2);
+  f.append(g);
+  const peu = el("div", { className: "linia", style: "margin-top:12px" });
+  peu.append(el("label", { className: "check", style: "margin:0" }, actiu, el("span", { textContent: "Actiu" })),
+             el("button", { className: "boto mini", type: "submit", textContent: nou ? "Crea" : "Desa" }));
+  f.append(peu);
+  f.addEventListener("submit", (e) => { e.preventDefault();
+    accio({ accio: "desa_avantatge", id: a.id, nom: nom.value, descripcio: desc.value, icona: icona.value, tipus: tipus.value,
+            limit_usos: Number(limit.value), actiu: actiu.checked, ordre: a.ordre ?? (estat.avantatges.length + 1) }); });
+
+  if (!nou && a.tipus === "per_dia") {
+    const zona = el("div", { style: "margin-top:14px; border-top:1px solid rgba(110,160,255,.3); padding-top:12px" });
+    zona.append(el("div", { className: "etiqueta", textContent: "Dies assenyalats (d'avui en endavant)" }));
+    const xips = el("div", { className: "xips" });
+    const dies = estat.dies.filter((d) => d.avantatge_id === a.id);
+    if (!dies.length) xips.append(el("span", { className: "petit", textContent: "Cap dia assenyalat: ara mateix aquest avantatge no es pot fer servir." }));
+    for (const d of dies) {
+      const treu = el("button", { type: "button", textContent: "×", ariaLabel: "Treu el " + dataCurta(d.dia) });
+      treu.addEventListener("click", () => accio({ accio: "treu_dia", avantatge_id: a.id, dia: d.dia }));
+      xips.append(el("span", { className: "xip" }, dataCurta(d.dia) + (d.dia === estat.avui ? " (avui)" : "") + (d.nota ? " · " + d.nota : ""), treu));
+    }
+    const dia = el("input", { type: "date", min: estat.avui, style: "width:100%;padding:11px;font:inherit;font-size:16px;border-radius:10px;border:1.5px solid rgba(110,160,255,.5);background:rgba(255,255,255,.07);color:#fff;color-scheme:dark" });
+    const nota = el("input", { type: "text", maxLength: 80, placeholder: "p. ex. Sènior A vs. Lluïsos" });
+    const afegeix = el("button", { className: "boto mini", type: "button", textContent: "Afegeix dia" });
+    afegeix.addEventListener("click", () => accio({ accio: "afegeix_dia", avantatge_id: a.id, dia: dia.value, nota: nota.value }));
+    const l = el("div", { className: "linia" }); l.append(camp("Data", dia), camp("Nota (opcional)", nota), afegeix);
+    zona.append(xips, l); f.append(zona);
+  }
+  return f;
+}
+
+function pinta() {
+  $("fpin").classList.add("ocult"); $("panell").classList.remove("ocult");
+  $("qui").textContent = "Sessió: " + estat.admin;
+  const ll = $("llista-av"); ll.innerHTML = "";
+  for (const a of estat.avantatges) ll.append(targetaAvantatge(a));
+
+  // Amics i samarretes: primer avantatge d'un sol cop
+  const unic = estat.avantatges.find((a) => a.tipus === "unic" && a.actiu) || estat.avantatges.find((a) => a.tipus === "unic");
+  $("th-unic").textContent = unic ? unic.nom : "—";
+  const lliurat = new Map(estat.usos.filter((u) => unic && u.avantatge_id === unic.id).map((u) => [u.amic_id, u.dia]));
+  const amics = [...estat.amics].sort((x, y) => y.created_at.localeCompare(x.created_at));
+  const pend = amics.filter((a) => !lliurat.has(a.id));
+  const fa7 = new Date(Date.now() - 7 * 864e5).toISOString();
+  const r = $("resum"); r.innerHTML = "";
+  for (const [n, t] of [[amics.length, "Amics"], [amics.filter((a) => a.created_at > fa7).length, "Nous (7 dies)"], [pend.length, "Samarretes pendents"]])
+    r.append(el("div", {}, el("b", { textContent: n }), t));
+  const cos = $("cos-am"); cos.innerHTML = "";
+  for (const a of ($("nomes-pend").checked ? pend : amics)) {
+    const fet = lliurat.get(a.id);
+    const b = el("button", { className: "boto mini" + (fet ? " sec" : ""), type: "button", textContent: fet ? "Desfés" : "Marca lliurada" });
+    if (unic) b.addEventListener("click", () => { b.disabled = true; accio({ accio: fet ? "desmarca_us" : "marca_us", amic_id: a.id, avantatge_id: unic.id }); });
+    const viu = a.valid_fins && a.valid_fins >= estat.avui;
+    cos.append(el("tr", {},
+      el("td", { textContent: String(a.num).padStart(4, "0") }), el("td", { className: "nom", textContent: a.nom }),
+      el("td", { textContent: new Date(a.created_at).toLocaleDateString("ca-ES") }), el("td", { textContent: a.talla || "—" }),
+      el("td", { textContent: !viu ? "Caducat" : a.estat === "actiu" ? "Actiu" : "Actiu, sense renovació" }),
+      el("td", { className: fet ? "fet" : "pend", textContent: fet ? "Lliurada " + new Date(fet + "T12:00:00").toLocaleDateString("ca-ES") : "Pendent" }),
+      el("td", {}, unic ? b : "")));
+  }
+  if (!cos.children.length) cos.append(el("tr", {}, el("td", { colSpan: 7, textContent: "No hi ha cap Amic en aquesta llista." })));
+}
+
+$("nou-av").addEventListener("click", () => { $("llista-av").append(targetaAvantatge({ tipus: "per_temporada", limit_usos: 1 })); $("llista-av").lastChild.querySelector("input[required]").focus(); });
+$("nomes-pend").addEventListener("change", pinta);
+for (const [t, p] of [["t-av", "p-av"], ["t-am", "p-am"]]) $(t).addEventListener("click", () => {
+  for (const [t2, p2] of [["t-av", "p-av"], ["t-am", "p-am"]]) { $(t2).setAttribute("aria-selected", t2 === t); $(p2).classList.toggle("ocult", p2 !== p); }
+});
+$("csv").addEventListener("click", () => {
+  const unic = estat.avantatges.find((a) => a.tipus === "unic");
+  const lliurat = new Set(estat.usos.filter((u) => unic && u.avantatge_id === unic.id).map((u) => u.amic_id));
+  const q = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+  const files = [["num", "nom", "email", "mobil", "talla", "estat", "valid_fins", "alta", "samarreta"].join(";")];
+  for (const a of estat.amics) files.push([a.num, a.nom, a.email, a.mobil, a.talla, a.estat, a.valid_fins, a.created_at.slice(0, 10), lliurat.has(a.id) ? "lliurada" : "pendent"].map(q).join(";"));
+  const url = URL.createObjectURL(new Blob(["﻿" + files.join("\r\n")], { type: "text/csv" }));
+  const l = el("a", { href: url, download: "amics-claret.csv" }); document.body.append(l); l.click(); l.remove(); URL.revokeObjectURL(url);
+});
+$("surt").addEventListener("click", (e) => { e.preventDefault(); sess.clear(); location.reload(); });
+$("fpin").addEventListener("submit", (e) => { e.preventDefault(); $("epin").textContent = ""; sess.set($("pin").value.trim()); accio({ accio: "llista" }); });
+if (sess.get()) accio({ accio: "llista" });
+</script>
+</body>
+</html>

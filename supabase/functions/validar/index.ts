@@ -21,12 +21,10 @@ Deno.serve(async (req) => {
   const token = String(b.token ?? "");
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-  if (!/^\d{6}$/.test(pin)) return json({ error: "PIN" }, 401);
-  const { data: p } = await db.rpc("personal_per_pin", { p_pin: pin });
-  if (!p?.id) {
-    await new Promise((r) => setTimeout(r, 1500)); // frena els intents de PIN
-    return json({ error: "PIN" }, 401);
-  }
+  if (!/^\d{6,10}$/.test(pin)) return json({ error: "PIN" }, 401);
+  const { data: p, error: ep } = await db.rpc("entra_pin", { p_pin: pin });
+  if (ep) return json({ error: ep.message.includes("BLOQUEJAT") ? "BLOQUEJAT" : "ERROR" }, ep.message.includes("BLOQUEJAT") ? 429 : 500);
+  if (!p?.id) return json({ error: "PIN" }, 401);
   // Només comprovar el PIN (pantalla d'entrada del personal)
   if (!token) return json({ personal: p.nom, rol: p.rol });
 

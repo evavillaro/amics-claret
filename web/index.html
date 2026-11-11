@@ -22,10 +22,12 @@
 
   <section class="caixa" aria-labelledby="t-av">
     <h2 id="t-av" style="margin-top:0">Què tens com a Amic</h2>
-    <ul class="llista">
-      <li><span aria-hidden="true">🍺</span><span><b>2 cerveses gratis</b> al bar els dies assenyalats pel club.</span></li>
-      <li><span aria-hidden="true">👕</span><span><b>Samarreta d'Amic</b> de benvinguda.</span></li>
-      <li><span aria-hidden="true">🎉</span><span><b>Festa dels Amics</b>: hi estàs convidat.</span></li>
+    <ul class="llista" id="avantatges">
+      <li><span aria-hidden="true">🍺</span><span><b>Cerveses gratis</b> 2 al bar els dies assenyalats pel club.</span></li>
+      <li><span aria-hidden="true">🎉</span><span><b>Festa dels Amics</b> Hi estàs convidat.</span></li>
+      <li><span aria-hidden="true">👕</span><span><b>Samarreta d'Amic</b> De benvinguda, en apuntar-te.</span></li>
+    </ul>
+    <ul class="llista" style="margin-top:10px">
       <li><span aria-hidden="true">📱</span><span><b>Carnet digital</b> al mòbil per identificar-te.</span></li>
       <li><span aria-hidden="true">💙</span><span><b>I molt més:</b> formar part de la família Amics Claret!</span></li>
     </ul>
@@ -75,6 +77,16 @@ const MISSATGES = {
   JA_ES_AMIC: "Aquest correu ja té un carnet d'Amic actiu. Si no trobes el teu enllaç, escriu al club.",
   CONFIG_PENDENT: "Les altes encara no estan obertes. Torna-ho a provar aviat.",
 };
+// Els avantatges es llegeixen del panell del club; si falla, queda la llista escrita a la pàgina
+crida("avantatges").then((r) => {
+  if (!r.ok || !r.d.avantatges || !r.d.avantatges.length) return;
+  const ul = document.getElementById("avantatges"); ul.innerHTML = "";
+  for (const a of r.d.avantatges) {
+    const li = document.createElement("li"), ic = document.createElement("span"), tx = document.createElement("span"), b = document.createElement("b");
+    ic.setAttribute("aria-hidden", "true"); ic.textContent = a.icona; b.textContent = a.nom;
+    tx.append(b, " " + a.descripcio); li.append(ic, tx); ul.append(li);
+  }
+}).catch(() => {});
 const f = document.getElementById("alta"), err = document.getElementById("error"), btn = document.getElementById("enviar");
 if (new URLSearchParams(location.search).has("cancel")) err.textContent = "No s'ha fet cap cobrament. Pots tornar-ho a provar quan vulguis.";
 f.addEventListener("submit", async (e) => {

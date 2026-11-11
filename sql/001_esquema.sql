@@ -130,7 +130,7 @@ begin
   -- bloqueig per amic: evita dobles escanejos simultanis
   select * into am from amics where id = p_amic for update;
   if not found then raise exception 'AMIC_NO_TROBAT'; end if;
-  if am.estat <> 'actiu' or (am.valid_fins is not null and am.valid_fins < avui) then
+  if am.estat not in ('actiu', 'cancellat') or am.valid_fins is null or am.valid_fins < avui then
     raise exception 'CARNET_NO_ACTIU';
   end if;
 
@@ -154,3 +154,26 @@ $$;
 revoke execute on function usos_restants(uuid, uuid)   from public, anon, authenticated;
 revoke execute on function consumir(uuid, uuid, uuid)  from public, anon, authenticated;
 revoke execute on function personal_per_pin(text)      from public, anon, authenticated;
+
+-- ───────── Panell i límit d'intents de PIN ─────────
+alter table avantatges add column descripcio text not null default '', add column icona text not null default '⭐';
+
+create table intents_pin (created_at timestamptz not null default now());
+create index intents_pin_idx on intents_pin (created_at);
+alter table intents_pin enable row level security;
+
+create or replace function entra_pin(p_pin text) returns personal
+language plpgsql set search_path = public, extensions as $$
+declare p personal;
+begin
+  if (select count(*) from intents_pin where created_at > now() - interval '10 minutes') >= 30 then
+    raise exception 'BLOQUEJAT';
+  end if;
+  select * into p from personal where actiu and pin_hash = crypt(p_pin, pin_hash) limit 1;
+  if p.id is null then
+    insert into intents_pin default values;
+    delete from intents_pin where created_at < now() - interval '1 day';
+  end if;
+  return p;
+end $$;
+revoke execute on function entra_pin(text) from public, anon, authenticated;
