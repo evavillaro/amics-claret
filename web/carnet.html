@@ -100,7 +100,7 @@ function mostraInstala() {
     ? ["Obre aquesta pàgina amb Safari.", "Toca el botó Comparteix (el quadrat amb la fletxa cap amunt).", "Tria «Afegeix a la pantalla d'inici»."]
     : android
     ? ["Toca el menú ⋮ de dalt a la dreta.", "Tria «Afegeix a la pantalla d'inici» o «Instal·la l'aplicació»."]
-    : ["Obre aquest enllaç al mòbil.", "Al menú del navegador, tria «Afegeix a la pantalla d'inici»."];
+    : ["Obre aquest enllaç del carnet al mòbil.", "Al menú del navegador, tria «Afegeix a la pantalla d'inici»."];
   const ol = $("passos"); ol.innerHTML = "";
   for (const x of passos) { const li = document.createElement("li"); li.textContent = x; ol.appendChild(li); }
   $("instala").classList.remove("ocult");
