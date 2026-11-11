@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
   if (!/^[0-9a-f]{32}$/.test(t)) return json({ error: "NO_TROBAT" }, 404);
 
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const { data: a } = await db.from("amics").select("num, nom, estat, valid_fins").eq("token", t).maybeSingle();
+  const { data: a } = await db.from("amics").select("num, nom, estat, valid_fins, stripe_subscription_id").eq("token", t).maybeSingle();
   if (!a) return json({ error: "NO_TROBAT" }, 404);
 
   const { data: avui } = await db.rpc("avui_bcn");
@@ -29,6 +29,7 @@ Deno.serve(async (req) => {
     nom: a.nom,
     estat,
     renovacio_automatica: a.estat === "actiu",
+    gestionable: !!a.stripe_subscription_id, // té quota a Stripe que pot gestionar o cancel·lar
     valid_fins: a.valid_fins,
     temporada,
   });

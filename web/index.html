@@ -55,8 +55,16 @@
           <option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option>
         </select>
 
+        <fieldset id="metodes" class="ocult" style="border:0; padding:0; margin:16px 0 0">
+          <legend style="padding:0; margin-bottom:6px">Com vols pagar?</legend>
+          <label class="check" style="margin-top:6px"><input type="radio" name="metode" value="targeta" checked>
+            <span><b>Targeta</b> · es renova automàticament cada octubre</span></label>
+          <label class="check" style="margin-top:10px"><input type="radio" name="metode" value="bizum">
+            <span><b>Bizum</b> · pagament únic; a l'octubre t'avisarem per renovar</span></label>
+        </fieldset>
+
         <label class="check"><input id="accepta" type="checkbox" required>
-          <span>Accepto les <a href="condicions.html" target="_blank" rel="noopener">condicions dels Amics i la política de privacitat</a>, i que la quota es renovi automàticament cada any fins que la cancel·li.</span></label>
+          <span>Accepto les <a href="condicions.html" target="_blank" rel="noopener">condicions dels Amics i la política de privacitat</a>, i que, si pago amb targeta, la quota es renovi automàticament cada any fins que la cancel·li.</span></label>
 
         <button class="boto gran" id="enviar" type="submit">Fes-te Amic · 40 €</button>
         <p class="error" id="error" role="alert"></p>
@@ -85,6 +93,7 @@ const MISSATGES = {
   TALLA: "Tria la talla de la samarreta.",
   CONDICIONS: "Cal acceptar les condicions per continuar.",
   JA_ES_AMIC: "Aquest correu ja té un carnet d'Amic actiu. Si no trobes el teu enllaç, escriu al club.",
+  BIZUM_NO_DISPONIBLE: "Ara mateix no es pot pagar amb Bizum. Tria targeta i torna-ho a provar.",
   CONFIG_PENDENT: "Les altes encara no estan obertes. Torna-ho a provar aviat.",
 };
 // Els avantatges es llegeixen del panell del club; si falla, queda la llista escrita a la pàgina
@@ -103,6 +112,7 @@ document.getElementById("recupera").addEventListener("submit", async (e) => {
   const r = await post("recupera", { email: document.getElementById("remail").value }).catch(() => ({ ok: false }));
   m.textContent = r.ok ? "Si aquest correu és d'un Amic, t'hi hem enviat l'enllaç del carnet." : "No s'ha pogut enviar. Torna-ho a provar.";
 });
+if (BIZUM || new URLSearchParams(location.search).has("bizum")) document.getElementById("metodes").classList.remove("ocult");
 const f = document.getElementById("alta"), err = document.getElementById("error"), btn = document.getElementById("enviar");
 if (new URLSearchParams(location.search).has("cancel")) err.textContent = "No s'ha fet cap cobrament. Pots tornar-ho a provar quan vulguis.";
 f.addEventListener("submit", async (e) => {
@@ -111,6 +121,7 @@ f.addEventListener("submit", async (e) => {
   const r = await post("alta", {
     nom: f.nom.value, email: f.email.value, mobil: f.mobil.value, talla: f.talla.value,
     accepta: document.getElementById("accepta").checked,
+    metode: (f.querySelector("input[name=metode]:checked") || {}).value || "targeta",
   }).catch(() => ({ ok: false, d: {} }));
   if (r.ok && r.d.url) { location.href = r.d.url; return; }
   err.textContent = MISSATGES[r.d.error] || "No s'ha pogut iniciar el pagament. Torna-ho a provar.";

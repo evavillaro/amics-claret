@@ -88,7 +88,7 @@ async function carrega(intents) {
   q.addData(new URL("v.html?t=" + t, location.href).href); q.make();
   $("qr").innerHTML = q.createSvgTag({ cellSize: 8, margin: 0, scalable: true });
   $("carnet").classList.remove("ocult");
-  if (c.estat !== "pendent") $("accions").classList.remove("ocult");
+  if (c.estat !== "pendent" && c.gestionable) $("accions").classList.remove("ocult");
   if (p.has("nou") && c.estat === "actiu") $("benvinguda").classList.remove("ocult");
   mostraInstala();
 }

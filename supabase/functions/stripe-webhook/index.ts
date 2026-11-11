@@ -46,10 +46,11 @@ Deno.serve(async (req) => {
     if (amicId && renov) {
       // Només la primera vegada (estat 'pendent'): així un reintent de Stripe no reenvia el correu
       const { data: fets, error } = await db.from("amics").update({
-        estat: "actiu",
+        // Subscripció (targeta) → es renova sola. Pagament únic (Bizum) → actiu sense renovació.
+        estat: o.mode === "subscription" ? "actiu" : "cancellat",
         valid_fins: dataMes(renov, GRACIA_DIES),
-        stripe_customer_id: o.customer,
-        stripe_subscription_id: o.subscription,
+        stripe_customer_id: o.customer ?? null,
+        stripe_subscription_id: o.subscription ?? null,
       }).eq("id", amicId).eq("estat", "pendent").select("nom, email, token, num");
       if (error) { console.error(error.message); return new Response("db", { status: 500 }); }
       if (fets?.length) await enviaCarnet(fets[0]).catch((e) => console.error("correu", String(e)));

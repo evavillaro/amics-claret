@@ -1,4 +1,6 @@
 // Adreça de les funcions del servidor (Supabase del club)
+// Bizum: posa-ho a true quan estigui activat a Stripe. Per provar-ho abans, obre la web amb ?bizum=1
+const BIZUM = false;
 const API = "https://bugaggeqrylgqyuawpwu.supabase.co/functions/v1";
 async function crida(nom, opcions) {
   const r = await fetch(`${API}/${nom}`, opcions);

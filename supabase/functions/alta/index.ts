@@ -42,6 +42,8 @@ Deno.serve(async (req) => {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "EMAIL" }, 400);
   if (!TALLES.includes(talla)) return json({ error: "TALLA" }, 400);
   if (b.accepta !== true) return json({ error: "CONDICIONS" }, 400);
+  // Bizum no admet cobraments recurrents: és un pagament únic, sense renovació automàtica
+  const metode = b.metode === "bizum" ? "bizum" : "targeta";
 
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
@@ -56,27 +58,34 @@ Deno.serve(async (req) => {
 
   const renov = properaRenovacio();
   const f = new URLSearchParams();
-  f.set("mode", "subscription");
   f.set("locale", "es"); // Stripe no té català
   f.set("customer_email", email);
   f.set("client_reference_id", amic.id);
   f.set("success_url", `${SITE_URL}/carnet.html?t=${amic.token}&nou=1`);
   f.set("cancel_url", `${SITE_URL}/?cancel=1`);
-  // 1) quota d'aquesta temporada, es cobra avui
+  f.set("metadata[amic_id]", amic.id);
+  f.set("metadata[renovacio]", String(renov));
+  f.set("metadata[metode]", metode);
+  // quota d'aquesta temporada, es cobra avui
   f.set("line_items[0][quantity]", "1");
   f.set("line_items[0][price_data][currency]", "eur");
   f.set("line_items[0][price_data][unit_amount]", String(QUOTA_CENTS));
-  f.set("line_items[0][price_data][product_data][name]", "Amics del Bàsquet Claret · alta");
-  // 2) renovació anual automàtica, primer cobrament l'1 d'octubre
-  f.set("line_items[1][quantity]", "1");
-  f.set("line_items[1][price_data][currency]", "eur");
-  f.set("line_items[1][price_data][unit_amount]", String(QUOTA_CENTS));
-  f.set("line_items[1][price_data][recurring][interval]", "year");
-  f.set("line_items[1][price_data][product_data][name]", "Amics del Bàsquet Claret · quota anual");
-  f.set("subscription_data[trial_end]", String(renov));
-  f.set("subscription_data[metadata][amic_id]", amic.id);
-  f.set("metadata[amic_id]", amic.id);
-  f.set("metadata[renovacio]", String(renov));
+  if (metode === "bizum") {
+    f.set("mode", "payment");
+    f.set("payment_method_types[0]", "bizum");
+    f.set("line_items[0][price_data][product_data][name]", "Amics del Bàsquet Claret · quota de la temporada");
+  } else {
+    f.set("mode", "subscription");
+    f.set("line_items[0][price_data][product_data][name]", "Amics del Bàsquet Claret · alta");
+    // renovació anual automàtica, primer cobrament l'1 d'octubre
+    f.set("line_items[1][quantity]", "1");
+    f.set("line_items[1][price_data][currency]", "eur");
+    f.set("line_items[1][price_data][unit_amount]", String(QUOTA_CENTS));
+    f.set("line_items[1][price_data][recurring][interval]", "year");
+    f.set("line_items[1][price_data][product_data][name]", "Amics del Bàsquet Claret · quota anual");
+    f.set("subscription_data[trial_end]", String(renov));
+    f.set("subscription_data[metadata][amic_id]", amic.id);
+  }
 
   const r = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",
@@ -86,7 +95,7 @@ Deno.serve(async (req) => {
   const s = await r.json();
   if (!r.ok) {
     console.error("stripe", s?.error?.message);
-    return json({ error: "STRIPE" }, 502);
+    return json({ error: metode === "bizum" ? "BIZUM_NO_DISPONIBLE" : "STRIPE" }, 502);
   }
   return json({ url: s.url });
 });
