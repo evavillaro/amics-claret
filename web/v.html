@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Validació · Amics del Bàsquet Claret</title>
+<link rel="icon" href="img/llops.jpg">
+<link rel="stylesheet" href="estil.css">
+</head>
+<body>
+<main class="pagina">
+  <header class="cap" style="margin-bottom:18px">
+    <img src="img/llops.jpg" alt="" width="60" height="100" style="width:60px">
+    <div><div class="sobre">Validació de carnet</div><h2 style="margin:0">Amics del Bàsquet Claret</h2></div>
+  </header>
+
+  <div id="veredicte" class="veredicte ocult" role="status" aria-live="assertive"></div>
+  <p id="avis" class="error centre" role="alert"></p>
+
+  <section id="avantatges" class="caixa ocult" aria-label="Avantatges"></section>
+
+  <section id="public" class="ocult">
+    <p class="petit centre">Només el personal del club pot registrar consumicions.</p>
+  </section>
+
+  <form id="fpin" class="caixa ocult" style="margin-top:18px">
+    <label for="pin" style="margin-top:0">PIN de personal</label>
+    <input id="pin" type="password" inputmode="numeric" pattern="\d{6}" maxlength="6" autocomplete="off" required>
+    <button class="boto" type="submit">Entra</button>
+    <p class="error" id="epin" role="alert"></p>
+  </form>
+  <button id="sopersonal" class="boto sec ocult" type="button">Sóc personal del club</button>
+  <p id="sessio" class="petit centre ocult"></p>
+</main>
+<script src="js/config.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const t = new URLSearchParams(location.search).get("t") || "";
+const AVISOS = {
+  LIMIT_ASSOLIT: "Ja ha gastat tot el que li tocava.",
+  AVUI_NO_DISPONIBLE: "Avui aquest avantatge no està disponible.",
+  CARNET_NO_ACTIU: "El carnet no està actiu.",
+  ERROR: "No s'ha pogut registrar. Torna-ho a provar.",
+};
+const dataCat = (iso) => iso ? new Date(iso + "T12:00:00").toLocaleDateString("ca-ES") : "";
+
+function veredicte(ok, titol, sota) {
+  const v = $("veredicte"); v.className = "veredicte " + (ok ? "ok" : "ko");
+  v.textContent = titol; if (sota) { const s = document.createElement("small"); s.textContent = sota; v.appendChild(s); }
+}
+
+function pintaPersonal(d) {
+  const a = d.amic;
+  veredicte(a.actiu, a.actiu ? "AMIC VÀLID" : "CARNET CADUCAT", `${a.nom} · Nº ${a.num}` + (a.talla ? ` · talla ${a.talla}` : ""));
+  $("avis").textContent = d.avis ? AVISOS[d.avis] || AVISOS.ERROR : "";
+  const c = $("avantatges"); c.innerHTML = ""; c.classList.toggle("ocult", !a.actiu);
+  for (const v of d.avantatges) {
+    const fila = document.createElement("div"); fila.className = "av";
+    const txt = document.createElement("div");
+    const nom = document.createElement("b"); nom.textContent = v.nom;
+    const q = document.createElement("div"); q.className = "queden";
+    q.textContent = v.restants === null ? "Avui no toca" : v.restants === 0 ? "Ja gastat" :
+      (v.tipus === "per_dia" ? `Avui: ${v.restants} de ${v.limit}` : `Pendent: ${v.restants} de ${v.limit}`);
+    txt.append(nom, q); fila.appendChild(txt);
+    if (v.restants) {
+      const b = document.createElement("button"); b.className = "boto"; b.type = "button"; b.textContent = "Registra";
+      b.addEventListener("click", () => { b.disabled = true; consulta(v.codi); });
+      fila.appendChild(b);
+    }
+    c.appendChild(fila);
+  }
+  $("sessio").textContent = "Personal: " + d.personal + " · "; 
+  const surt = document.createElement("a"); surt.href = "#"; surt.textContent = "surt";
+  surt.addEventListener("click", (e) => { e.preventDefault(); pin.clear(); location.reload(); });
+  $("sessio").appendChild(surt); $("sessio").classList.remove("ocult");
+  $("fpin").classList.add("ocult"); $("sopersonal").classList.add("ocult"); $("public").classList.add("ocult");
+}
+
+async function consulta(consumir) {
+  const r = await post("validar", { pin: pin.get(), token: t, consumir }).catch(() => ({ ok: false, status: 0, d: {} }));
+  if (r.status === 401) { pin.clear(); $("epin").textContent = "PIN incorrecte."; return vistaPublica(true); }
+  if (r.status === 404) return veredicte(false, "CARNET NO VÀLID", "Aquest codi no correspon a cap Amic");
+  if (!r.ok) { $("avis").textContent = "Sense connexió amb el servidor. Torna-ho a provar."; return; }
+  pintaPersonal(r.d);
+}
+
+async function vistaPublica(demanaPin) {
+  const r = await crida("carnet?t=" + encodeURIComponent(t)).catch(() => ({ ok: false, d: {} }));
+  if (!r.ok) veredicte(false, "CARNET NO VÀLID", "Aquest codi no correspon a cap Amic");
+  else veredicte(r.d.estat === "actiu", r.d.estat === "actiu" ? "AMIC VÀLID" : "CARNET CADUCAT", `${r.d.nom} · Nº ${r.d.num}`);
+  $("public").classList.remove("ocult");
+  $("fpin").classList.toggle("ocult", !demanaPin); $("sopersonal").classList.toggle("ocult", !!demanaPin);
+  if (demanaPin) $("pin").focus();
+}
+
+$("sopersonal").addEventListener("click", () => { $("sopersonal").classList.add("ocult"); $("fpin").classList.remove("ocult"); $("pin").focus(); });
+$("fpin").addEventListener("submit", (e) => { e.preventDefault(); $("epin").textContent = ""; pin.set($("pin").value.trim()); consulta(); });
+
+if (pin.get()) consulta(); else vistaPublica(false);
+</script>
+</body>
+</html>

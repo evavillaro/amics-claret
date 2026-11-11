@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Carnet d'Amic · Bàsquet Claret</title>
+<link rel="icon" href="img/llops.jpg">
+<link rel="apple-touch-icon" href="img/llops.jpg">
+<link rel="stylesheet" href="estil.css">
+</head>
+<body>
+<main class="pagina">
+  <p id="carregant" class="centre">Carregant el carnet…</p>
+  <p id="benvinguda" class="caixa ocult" role="status"><b>Benvingut/da als Amics!</b> Aquest és el teu carnet. Desa aquesta pàgina a la pantalla d'inici del mòbil o guarda'n l'enllaç: és personal i no s'ha de compartir.</p>
+
+  <article id="carnet" class="carnet ocult" style="margin-top:14px">
+    <header class="cap">
+      <img src="img/llops.jpg" alt="Escut dels Claret Llops" width="92" height="153">
+      <div>
+        <div class="sobre">Carnet d'Amic</div>
+        <h1 style="font-size:clamp(1.9rem,8vw,2.8rem)">Amics del <span>Bàsquet Claret</span></h1>
+      </div>
+    </header>
+    <div style="margin-top:22px">
+      <div class="etiqueta">Nom i cognoms</div>
+      <div class="nom" id="nom"></div>
+      <div class="fila">
+        <div><div class="etiqueta">Nº d'Amic</div><div class="num" id="num"></div></div>
+        <div><div class="etiqueta">Temporada</div><div class="temp" id="temp"></div></div>
+      </div>
+      <p class="centre" style="margin:16px 0 0"><span class="estat" id="estat"></span></p>
+    </div>
+    <div class="qr" id="qr" role="img" aria-label="Codi QR per validar el carnet"></div>
+    <p class="centre etiqueta" style="color:#dbe6ff">Escaneja per validar</p>
+    <p class="centre petit" id="valid"></p>
+    <p class="lema" style="margin-top:14px">Amics que sumen.</p>
+  </article>
+
+  <div id="accions" class="ocult">
+    <button class="boto sec" id="gestiona" type="button">Gestiona o cancel·la la renovació</button>
+    <p class="error" id="error" role="alert"></p>
+  </div>
+  <div id="noexisteix" class="caixa centre ocult">
+    <h2 style="margin-top:0">Carnet no trobat</h2>
+    <p>Aquest enllaç no correspon a cap Amic. Revisa'l o <a href="./">fes-te Amic</a>.</p>
+  </div>
+</main>
+<script src="js/qrcode.js"></script>
+<script src="js/config.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const p = new URLSearchParams(location.search), t = p.get("t") || "";
+const dataCat = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("ca-ES", { day: "numeric", month: "long", year: "numeric" });
+
+async function carrega(intents) {
+  const r = await crida("carnet?t=" + encodeURIComponent(t)).catch(() => ({ ok: false, d: {} }));
+  $("carregant").classList.add("ocult");
+  if (!r.ok) { $("noexisteix").classList.remove("ocult"); return; }
+  const c = r.d;
+  // Acabat de pagar: Stripe pot trigar uns segons a confirmar
+  if (c.estat === "pendent" && intents > 0) {
+    $("carregant").textContent = "Confirmant el pagament…"; $("carregant").classList.remove("ocult");
+    return setTimeout(() => carrega(intents - 1), 2500);
+  }
+  $("nom").textContent = c.nom; $("num").textContent = c.num; $("temp").textContent = c.temporada;
+  const e = $("estat");
+  if (c.estat === "actiu") { e.textContent = "ACTIU"; e.className = "estat ok"; }
+  else if (c.estat === "pendent") { e.textContent = "PAGAMENT PENDENT"; e.className = "estat ko"; }
+  else { e.textContent = "CADUCAT"; e.className = "estat ko"; }
+  if (c.valid_fins) $("valid").textContent = (c.renovacio_automatica ? "Es renova automàticament · vàlid fins al " : "Sense renovació · vàlid fins al ") + dataCat(c.valid_fins);
+  const q = qrcode(0, "M");
+  q.addData(new URL("v.html?t=" + t, location.href).href); q.make();
+  $("qr").innerHTML = q.createSvgTag({ cellSize: 8, margin: 0, scalable: true });
+  $("carnet").classList.remove("ocult");
+  if (c.estat !== "pendent") $("accions").classList.remove("ocult");
+  if (p.has("nou") && c.estat === "actiu") $("benvinguda").classList.remove("ocult");
+}
+carrega(p.has("nou") ? 8 : 0);
+
+$("gestiona").addEventListener("click", async () => {
+  const b = $("gestiona"); b.disabled = true; $("error").textContent = "";
+  const r = await post("portal", { token: t }).catch(() => ({ ok: false, d: {} }));
+  if (r.ok && r.d.url) { location.href = r.d.url; return; }
+  $("error").textContent = "No s'ha pogut obrir la gestió de la quota. Torna-ho a provar.";
+  b.disabled = false;
+});
+</script>
+</body>
+</html>

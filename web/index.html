@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Amics del Bàsquet Claret</title>
+<meta name="description" content="Fes-te Amic del Bàsquet Claret: dona suport al club per 40 € l'any i gaudeix dels avantatges.">
+<link rel="icon" href="img/llops.jpg">
+<link rel="stylesheet" href="estil.css">
+</head>
+<body>
+<main class="pagina">
+  <header class="cap">
+    <img src="img/llops.jpg" alt="Escut dels Claret Llops" width="92" height="153">
+    <div>
+      <div class="sobre">Fes-te Amic</div>
+      <h1>Amics del <span>Bàsquet Claret</span></h1>
+    </div>
+  </header>
+
+  <p style="margin-top:22px">Una manera de donar suport al club sense ser-ne soci. La teva aportació ajuda a millorar les instal·lacions, a cobrir quotes perquè ningú deixi de jugar i a formar els nostres entrenadors.</p>
+
+  <section class="caixa" aria-labelledby="t-av">
+    <h2 id="t-av" style="margin-top:0">Què tens com a Amic</h2>
+    <ul class="llista">
+      <li><span aria-hidden="true">🍺</span><span><b>2 cerveses gratis</b> al bar els dies assenyalats pel club.</span></li>
+      <li><span aria-hidden="true">👕</span><span><b>Samarreta d'Amic</b> de benvinguda.</span></li>
+      <li><span aria-hidden="true">🎉</span><span><b>Festa dels Amics</b>: hi estàs convidat.</span></li>
+      <li><span aria-hidden="true">📱</span><span><b>Carnet digital</b> al mòbil per identificar-te.</span></li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="t-alta">
+    <h2 id="t-alta">Apunta-t'hi</h2>
+    <div class="caixa">
+      <div class="preu">40 € <small>/ any</small></div>
+      <p class="petit" style="margin:4px 0 0">Pagues avui i es renova automàticament cada any la primera setmana d'octubre. Pots cancel·lar la renovació quan vulguis des del teu carnet.</p>
+
+      <form id="alta" novalidate>
+        <label for="nom">Nom i cognoms</label>
+        <input id="nom" name="nom" type="text" autocomplete="name" required maxlength="80">
+
+        <label for="email">Correu electrònic</label>
+        <input id="email" name="email" type="email" autocomplete="email" required maxlength="120">
+
+        <label for="mobil">Mòbil <span class="petit">(opcional)</span></label>
+        <input id="mobil" name="mobil" type="tel" autocomplete="tel" maxlength="20">
+
+        <label for="talla">Talla de samarreta</label>
+        <select id="talla" name="talla" required>
+          <option value="">Tria una talla</option>
+          <option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option>
+        </select>
+
+        <label class="check"><input id="accepta" type="checkbox" required>
+          <span>Accepto les <a href="condicions.html" target="_blank" rel="noopener">condicions dels Amics i la política de privacitat</a>, i que la quota es renovi automàticament cada any fins que la cancel·li.</span></label>
+
+        <button class="boto gran" id="enviar" type="submit">Fes-te Amic · 40 €</button>
+        <p class="error" id="error" role="alert"></p>
+        <p class="petit">Pagament segur amb Stripe. El club no veu ni desa les dades de la teva targeta.</p>
+      </form>
+    </div>
+  </section>
+
+  <p class="lema">Amics que sumen.</p>
+</main>
+<script src="js/config.js"></script>
+<script>
+const MISSATGES = {
+  NOM: "Escriu el teu nom i cognoms.",
+  EMAIL: "Revisa el correu electrònic.",
+  TALLA: "Tria la talla de la samarreta.",
+  CONDICIONS: "Cal acceptar les condicions per continuar.",
+  JA_ES_AMIC: "Aquest correu ja té un carnet d'Amic actiu. Si no trobes el teu enllaç, escriu al club.",
+  CONFIG_PENDENT: "Les altes encara no estan obertes. Torna-ho a provar aviat.",
+};
+const f = document.getElementById("alta"), err = document.getElementById("error"), btn = document.getElementById("enviar");
+if (new URLSearchParams(location.search).has("cancel")) err.textContent = "No s'ha fet cap cobrament. Pots tornar-ho a provar quan vulguis.";
+f.addEventListener("submit", async (e) => {
+  e.preventDefault(); err.textContent = "";
+  btn.disabled = true; btn.textContent = "Un moment…";
+  const r = await post("alta", {
+    nom: f.nom.value, email: f.email.value, mobil: f.mobil.value, talla: f.talla.value,
+    accepta: document.getElementById("accepta").checked,
+  }).catch(() => ({ ok: false, d: {} }));
+  if (r.ok && r.d.url) { location.href = r.d.url; return; }
+  err.textContent = MISSATGES[r.d.error] || "No s'ha pogut iniciar el pagament. Torna-ho a provar.";
+  btn.disabled = false; btn.textContent = "Fes-te Amic · 40 €";
+});
+</script>
+</body>
+</html>
