@@ -23,7 +23,7 @@ async function enviaCarnet(a: { nom: string; email: string; token: string; num: 
 <p>Ja formes part de la família Amics Claret. El teu número d'Amic és el <b style="color:#f68f16">${String(a.num).padStart(4, "0")}</b>.</p>
 <p>Aquest és el teu carnet digital. Ensenya'l al bar i a la Festa dels Amics:</p>
 <p style="text-align:center;margin:26px 0"><a href="${url}" style="background:#f68f16;color:#1a0d00;font-weight:bold;text-decoration:none;padding:14px 26px;border-radius:10px;display:inline-block">Obre el meu carnet</a></p>
-<p style="font-size:13px;color:#c5d4f5">Guarda aquest correu: l'enllaç és personal i no s'ha de compartir. Des del carnet pots gestionar la renovació de la quota quan vulguis.</p>
+<p style="font-size:13px;color:#c5d4f5">Guarda aquest correu: l'enllaç és personal i no s'ha de compartir.</p>
 <p style="color:#f68f16;font-style:italic;font-weight:bold;text-align:center;font-size:18px;margin:22px 0 0">Amics que sumen.</p></div>`;
   const subject = "El teu carnet d'Amic del Bàsquet Claret";
   // Resend (domini propi verificat) si hi ha clau; si no, Brevo (permet enviar des d'un Gmail verificat)
