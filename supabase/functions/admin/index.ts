@@ -75,6 +75,25 @@ Deno.serve(async (req) => {
       const { error } = await db.from("usos").delete().eq("amic_id", String(b.amic_id)).eq("avantatge_id", av.id);
       if (error) return json({ error: "DB" }, 500);
     }
+  } else if (accio === "crea_amic") {
+    // Alta manual (regal, pagament en mà...): actiu sense renovació fins a la data indicada. No passa per Stripe.
+    const nom = String(b.nom ?? "").trim().slice(0, 80);
+    const email = String(b.email ?? "").trim().toLowerCase().slice(0, 120);
+    const talla = String(b.talla ?? "").trim().toUpperCase();
+    if (nom.length < 3) return json({ error: "NOM" }, 400);
+    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "EMAIL" }, 400);
+    if (!esData(b.valid_fins)) return json({ error: "DIA" }, 400);
+    const { error } = await db.from("amics").insert({
+      nom, email, mobil: String(b.mobil ?? "").trim().slice(0, 20) || null,
+      talla: ["XS", "S", "M", "L", "XL", "XXL"].includes(talla) ? talla : null,
+      estat: "cancellat", valid_fins: b.valid_fins,
+    });
+    if (error) return json({ error: "DB" }, 500);
+    if (email && b.envia_correu === true) {
+      await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/recupera`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }),
+      }).catch((e) => console.error("correu", String(e)));
+    }
   } else if (["atura_renovacio", "baixa", "valid_fins", "esborra"].includes(accio)) {
     // Gestió d'un Amic. Si té subscripció a Stripe, primer s'hi aplica el canvi: si Stripe falla, no es toca res.
     const { data: am } = await db.from("amics").select("id, estat, stripe_subscription_id").eq("id", String(b.amic_id)).maybeSingle();
@@ -126,7 +145,7 @@ Deno.serve(async (req) => {
     .select("id, codi, nom, descripcio, icona, tipus, limit_usos, actiu, ordre").order("ordre").order("nom");
   const { data: dies } = await db.from("dies_marcats").select("avantatge_id, dia, nota").gte("dia", avui).order("dia");
   const { data: amics } = await db.from("amics")
-    .select("id, num, nom, email, mobil, talla, estat, valid_fins, created_at, stripe_subscription_id").neq("estat", "pendent").order("num");
+    .select("id, num, nom, email, mobil, talla, estat, valid_fins, created_at, token, stripe_subscription_id").neq("estat", "pendent").order("num");
   const amicsNet = (amics ?? []).map(({ stripe_subscription_id, ...a }) => ({ ...a, te_subscripcio: !!stripe_subscription_id }));
   const unics = (avantatges ?? []).filter((a) => a.tipus === "unic").map((a) => a.id);
   const { data: usos } = unics.length

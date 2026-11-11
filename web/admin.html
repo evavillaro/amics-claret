@@ -39,7 +39,7 @@
   .inactiu{opacity:.6}
   .fila-gestio td{white-space:normal; background:rgba(110,160,255,.08)}
   .gestio{padding:6px 2px 10px; position:sticky; left:8px; width:min(770px, calc(100vw - 92px))}
-  .gestio .data{width:100%; padding:10px; font:inherit; font-size:16px; border-radius:10px; border:1.5px solid rgba(110,160,255,.5); background:rgba(255,255,255,.07); color:#fff; color-scheme:dark}
+  .gestio .data, #f-am .data{width:100%; padding:10px; font:inherit; font-size:16px; border-radius:10px; border:1.5px solid rgba(110,160,255,.5); background:rgba(255,255,255,.07); color:#fff; color-scheme:dark}
   .boto.perill{color:#ffb4b4; border-color:#ef4444}
   .boto.armat{background:#ef4444; color:#fff; border-color:#ef4444}
 </style>
@@ -77,6 +77,24 @@
         <label class="check" style="margin:0"><input type="checkbox" id="nomes-pend"> <span>Només samarretes pendents</span></label>
         <button class="boto sec mini" id="csv" type="button">Descarrega CSV</button>
       </div>
+      <button class="boto sec" id="nou-am" type="button" style="margin:0 0 12px">+ Afegeix un Amic (regal o pagament en mà)</button>
+      <form id="f-am" class="caixa ocult" style="margin-bottom:14px">
+        <div class="linia">
+          <div><label for="am-nom">Nom i cognoms</label><input id="am-nom" type="text" maxlength="80" required></div>
+          <div><label for="am-email">Correu (opcional)</label><input id="am-email" type="email" maxlength="120"></div>
+        </div>
+        <div class="linia" style="margin-top:10px">
+          <div><label for="am-mobil">Mòbil (opcional)</label><input id="am-mobil" type="tel" maxlength="20"></div>
+          <div><label for="am-talla">Talla</label><select id="am-talla"><option value="">—</option><option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option></select></div>
+          <div><label for="am-fins">Carnet vàlid fins al</label><input id="am-fins" type="date" class="data" required></div>
+        </div>
+        <label class="check" style="margin-top:12px"><input type="checkbox" id="am-correu" checked> <span>Envia-li el carnet per correu (si has posat el correu)</span></label>
+        <div class="linia" style="margin-top:12px">
+          <button class="boto mini" type="submit">Crea l'Amic</button>
+          <button class="boto sec mini" type="button" id="am-cancel">Cancel·la</button>
+        </div>
+        <p class="petit">Queda actiu sense renovació fins a la data. No es cobra res: és per a regals o per a qui paga en mà.</p>
+      </form>
       <div class="caixa taula"><table>
         <thead><tr><th>Nº</th><th>Nom</th><th>Alta</th><th>Talla</th><th>Estat</th><th id="th-unic">Samarreta</th><th></th><th></th></tr></thead>
         <tbody id="cos-am"></tbody>
@@ -97,7 +115,7 @@ const sess = {
   clear() { this.v = ""; try { sessionStorage.removeItem("amics_admin"); } catch (_) {} },
 };
 const TIPUS = { per_dia: "Per dia assenyalat", per_temporada: "Per temporada", unic: "Un sol cop (p. ex. samarreta)" };
-const ERRORS = { NOM: "Posa un nom a l'avantatge.", LIMIT: "El límit ha de ser un número entre 1 i 99.", DIA: "Tria una data.", BLOQUEJAT: "Massa intents de PIN. Espera 10 minuts." };
+const ERRORS = { NOM: "Falta el nom.", EMAIL: "Revisa el correu.", LIMIT: "El límit ha de ser un número entre 1 i 99.", DIA: "Tria una data.", BLOQUEJAT: "Massa intents de PIN. Espera 10 minuts." };
 const dataCurta = (iso) => new Date(iso.slice(0, 10) + "T12:00:00").toLocaleDateString("ca-ES", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 let estat = null;
 
@@ -184,7 +202,15 @@ function filaGestio(a, viu) {
   caixa.append(l2, el("p", { className: "petit", textContent:
     (a.te_subscripcio ? "Té quota a Stripe: la baixa i l'esborrat també li cancel·len la renovació. " : "No té quota a Stripe. ") +
     "Cap d'aquestes accions retorna diners: les devolucions es fan des de Stripe." }));
-  caixa.append(el("p", { className: "petit", textContent: [a.email, a.mobil].filter(Boolean).join(" · ") }));
+  const url = new URL("carnet.html?t=" + a.token, location.href).href;
+  const copia = el("button", { className: "boto sec mini", type: "button", textContent: "Copia l'enllaç del carnet" });
+  copia.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(url); copia.textContent = "Enllaç copiat"; }
+    catch (_) { copia.replaceWith(el("input", { type: "text", value: url, readOnly: true, className: "data" })); }
+  });
+  const obre = el("a", { href: url, target: "_blank", rel: "noopener", textContent: "Obre el carnet" });
+  const l3 = el("div", { className: "linia", style: "margin-top:6px; align-items:center" }); l3.append(copia, obre);
+  caixa.append(l3, el("p", { className: "petit", textContent: [a.email, a.mobil].filter(Boolean).join(" · ") }));
   return el("tr", { className: "fila-gestio" }, el("td", { colSpan: 8 }, caixa));
 }
 // Botó que demana confirmació amb un segon toc (sense finestres emergents)
@@ -232,6 +258,19 @@ function pinta() {
 }
 
 $("nou-av").addEventListener("click", () => { $("llista-av").append(targetaAvantatge({ tipus: "per_temporada", limit_usos: 1 })); $("llista-av").lastChild.querySelector("input[required]").focus(); });
+// Data per defecte d'un carnet nou: 8 d'octubre vinent (o de l'any següent si ja som a partir de juliol)
+function finsPerDefecte() {
+  const [any, mes] = estat.avui.split("-").map(Number);
+  return (mes >= 7 ? any + 1 : any) + "-10-08";
+}
+$("nou-am").addEventListener("click", () => { $("f-am").classList.remove("ocult"); $("nou-am").classList.add("ocult"); $("am-fins").value = finsPerDefecte(); $("am-nom").focus(); });
+$("am-cancel").addEventListener("click", () => { $("f-am").classList.add("ocult"); $("nou-am").classList.remove("ocult"); });
+$("f-am").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const ok = await accio({ accio: "crea_amic", nom: $("am-nom").value, email: $("am-email").value, mobil: $("am-mobil").value,
+    talla: $("am-talla").value, valid_fins: $("am-fins").value, envia_correu: $("am-correu").checked });
+  if (ok) { $("f-am").reset(); $("f-am").classList.add("ocult"); $("nou-am").classList.remove("ocult"); }
+});
 $("nomes-pend").addEventListener("change", pinta);
 for (const [t, p] of [["t-av", "p-av"], ["t-am", "p-am"]]) $(t).addEventListener("click", () => {
   for (const [t2, p2] of [["t-av", "p-av"], ["t-am", "p-am"]]) { $(t2).setAttribute("aria-selected", t2 === t); $(p2).classList.toggle("ocult", p2 !== p); }
