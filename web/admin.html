@@ -8,7 +8,7 @@
 <link rel="icon" href="img/llops.jpg">
 <link rel="stylesheet" href="estil.css">
 <style>
-  .pagina{max-width:860px}
+  .pagina{max-width:1120px}
   .pestanyes{display:flex; gap:8px; margin:18px 0}
   .pestanyes button{flex:1; padding:12px; border-radius:10px; border:1.5px solid var(--blau); background:transparent; color:var(--cel); font:inherit; font-weight:700; cursor:pointer}
   .pestanyes button[aria-selected=true]{background:var(--taronja); color:#1a0d00; border-color:var(--taronja)}
@@ -28,6 +28,9 @@
   th,td{text-align:left; padding:9px 8px; border-bottom:1px solid rgba(110,160,255,.25); white-space:nowrap}
   th{color:var(--cel); font-size:.75rem; text-transform:uppercase; letter-spacing:.05em}
   td.nom{white-space:normal; min-width:140px}
+  /* La columna de «Gestiona» queda sempre visible, encara que la taula no hi càpiga */
+  #cos-am tr:not(.fila-gestio) td:last-child, thead th:last-child{position:sticky; right:0; background:#04174a; box-shadow:-10px 0 10px -6px rgba(0,0,0,.45)}
+  .taula{padding-right:0}
   .pend{color:var(--taronja); font-weight:700}
   .fet{color:var(--verd); font-weight:700}
   .resum{display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px}
