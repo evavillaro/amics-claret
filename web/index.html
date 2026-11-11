@@ -65,6 +65,16 @@
     </div>
   </section>
 
+  <section class="caixa" style="margin-top:22px" aria-labelledby="t-rec">
+    <h2 id="t-rec" style="margin-top:0; font-size:1.1rem">Ja ets Amic i no trobes el carnet?</h2>
+    <form id="recupera" class="petit">
+      <label for="remail">El teu correu electrònic</label>
+      <input id="remail" type="email" autocomplete="email" required maxlength="120">
+      <button class="boto sec" type="submit" style="margin-top:12px">Envia'm l'enllaç</button>
+      <p id="rmsg" role="status" style="min-height:1.5em; margin:10px 0 0"></p>
+    </form>
+  </section>
+
   <p class="lema">Amics que sumen.</p>
 </main>
 <script src="js/config.js"></script>
@@ -87,6 +97,12 @@ crida("avantatges").then((r) => {
     tx.append(b, " " + a.descripcio); li.append(ic, tx); ul.append(li);
   }
 }).catch(() => {});
+document.getElementById("recupera").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const m = document.getElementById("rmsg"); m.textContent = "Un moment…";
+  const r = await post("recupera", { email: document.getElementById("remail").value }).catch(() => ({ ok: false }));
+  m.textContent = r.ok ? "Si aquest correu és d'un Amic, t'hi hem enviat l'enllaç del carnet." : "No s'ha pogut enviar. Torna-ho a provar.";
+});
 const f = document.getElementById("alta"), err = document.getElementById("error"), btn = document.getElementById("enviar");
 if (new URLSearchParams(location.search).has("cancel")) err.textContent = "No s'ha fet cap cobrament. Pots tornar-ho a provar quan vulguis.";
 f.addEventListener("submit", async (e) => {
