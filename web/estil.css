@@ -43,6 +43,7 @@ input:focus,select:focus,button:focus-visible,a:focus-visible{outline:3px solid 
 }
 .boto[disabled]{opacity:.55; cursor:wait}
 .boto.sec{background:transparent; color:var(--cel); border:1.5px solid var(--blau); font-weight:700; font-size:1rem}
+.boto.petita{width:auto; margin:16px auto 0; padding:9px 22px; font-size:.88rem; border-radius:10px}
 .boto.gran{font-size:1.25rem; padding:20px}
 .error{color:#ffb4b4; margin-top:12px; min-height:1.5em}
 .petit{font-size:.85rem; color:#c5d4f5}
