@@ -34,6 +34,11 @@
   .resum div{flex:1 1 120px; padding:12px; border-radius:12px; background:rgba(110,160,255,.12)}
   .resum b{display:block; font-size:1.6rem; font-variant-numeric:tabular-nums}
   .inactiu{opacity:.6}
+  .fila-gestio td{white-space:normal; background:rgba(110,160,255,.08)}
+  .gestio{padding:6px 2px 10px; position:sticky; left:8px; width:min(770px, calc(100vw - 92px))}
+  .gestio .data{width:100%; padding:10px; font:inherit; font-size:16px; border-radius:10px; border:1.5px solid rgba(110,160,255,.5); background:rgba(255,255,255,.07); color:#fff; color-scheme:dark}
+  .boto.perill{color:#ffb4b4; border-color:#ef4444}
+  .boto.armat{background:#ef4444; color:#fff; border-color:#ef4444}
 </style>
 </head>
 <body>
@@ -70,10 +75,10 @@
         <button class="boto sec mini" id="csv" type="button">Descarrega CSV</button>
       </div>
       <div class="caixa taula"><table>
-        <thead><tr><th>Nº</th><th>Nom</th><th>Alta</th><th>Talla</th><th>Estat</th><th id="th-unic">Samarreta</th><th></th></tr></thead>
+        <thead><tr><th>Nº</th><th>Nom</th><th>Alta</th><th>Talla</th><th>Estat</th><th id="th-unic">Samarreta</th><th></th><th></th></tr></thead>
         <tbody id="cos-am"></tbody>
       </table></div>
-      <p class="petit">Ordenats de més nou a més antic.</p>
+      <p class="petit">Ordenats de més nou a més antic. Amb «Gestiona» pots canviar la validesa, aturar la renovació, donar de baixa o esborrar un Amic.</p>
     </section>
 
     <p class="petit centre" style="margin-top:24px"><span id="qui"></span> · <a href="#" id="surt">surt</a></p>
@@ -149,6 +154,47 @@ function targetaAvantatge(a) {
   return f;
 }
 
+let obert = null; // Amic amb el panell de gestió desplegat
+function botoGestio(a) {
+  const b = el("button", { className: "boto sec mini", type: "button", textContent: obert === a.id ? "Tanca" : "Gestiona" });
+  b.setAttribute("aria-expanded", obert === a.id);
+  b.addEventListener("click", () => { obert = obert === a.id ? null : a.id; pinta(); });
+  return b;
+}
+function filaGestio(a, viu) {
+  const caixa = el("div", { className: "gestio" });
+  // 1) Validesa
+  const data = el("input", { type: "date", value: a.valid_fins || "", className: "data" });
+  const desa = el("button", { className: "boto mini", type: "button", textContent: "Desa la data" });
+  desa.addEventListener("click", () => accio({ accio: "valid_fins", amic_id: a.id, valid_fins: data.value }));
+  const l1 = el("div", { className: "linia" }); l1.append(camp("Carnet vàlid fins al", data), desa);
+  caixa.append(l1, el("p", { className: "petit", textContent: "Canvia la data per allargar o escurçar el carnet (p. ex. si ha pagat en mà). No cobra res a Stripe." }));
+  // 2) Renovació i baixa
+  const l2 = el("div", { className: "linia", style: "margin-top:6px" });
+  if (a.te_subscripcio && a.estat === "actiu") {
+    const atura = el("button", { className: "boto sec mini", type: "button", textContent: "Atura la renovació" });
+    atura.addEventListener("click", () => accio({ accio: "atura_renovacio", amic_id: a.id }));
+    l2.append(atura);
+  }
+  if (viu) l2.append(dosPassos("Dona de baixa ara", "Segur? El carnet caduca avui", () => accio({ accio: "baixa", amic_id: a.id })));
+  l2.append(dosPassos("Esborra l'Amic", "Segur? No es pot desfer", () => { obert = null; return accio({ accio: "esborra", amic_id: a.id }); }, true));
+  caixa.append(l2, el("p", { className: "petit", textContent:
+    (a.te_subscripcio ? "Té quota a Stripe: la baixa i l'esborrat també li cancel·len la renovació. " : "No té quota a Stripe. ") +
+    "Cap d'aquestes accions retorna diners: les devolucions es fan des de Stripe." }));
+  caixa.append(el("p", { className: "petit", textContent: [a.email, a.mobil].filter(Boolean).join(" · ") }));
+  return el("tr", { className: "fila-gestio" }, el("td", { colSpan: 8 }, caixa));
+}
+// Botó que demana confirmació amb un segon toc (sense finestres emergents)
+function dosPassos(text, textSegur, fes, perill) {
+  const b = el("button", { className: "boto sec mini" + (perill ? " perill" : ""), type: "button", textContent: text });
+  let armat = false, t;
+  b.addEventListener("click", () => {
+    if (!armat) { armat = true; b.textContent = textSegur; b.classList.add("armat"); t = setTimeout(() => { armat = false; b.textContent = text; b.classList.remove("armat"); }, 5000); return; }
+    clearTimeout(t); b.disabled = true; fes();
+  });
+  return b;
+}
+
 function pinta() {
   $("fpin").classList.add("ocult"); $("panell").classList.remove("ocult");
   $("qui").textContent = "Sessió: " + estat.admin;
@@ -176,9 +222,10 @@ function pinta() {
       el("td", { textContent: new Date(a.created_at).toLocaleDateString("ca-ES") }), el("td", { textContent: a.talla || "—" }),
       el("td", { textContent: !viu ? "Caducat" : a.estat === "actiu" ? "Actiu" : "Actiu, sense renovació" }),
       el("td", { className: fet ? "fet" : "pend", textContent: fet ? "Lliurada " + new Date(fet + "T12:00:00").toLocaleDateString("ca-ES") : "Pendent" }),
-      el("td", {}, unic ? b : "")));
+      el("td", {}, unic ? b : ""), el("td", {}, botoGestio(a))));
+    if (obert === a.id) cos.append(filaGestio(a, viu));
   }
-  if (!cos.children.length) cos.append(el("tr", {}, el("td", { colSpan: 7, textContent: "No hi ha cap Amic en aquesta llista." })));
+  if (!cos.children.length) cos.append(el("tr", {}, el("td", { colSpan: 8, textContent: "No hi ha cap Amic en aquesta llista." })));
 }
 
 $("nou-av").addEventListener("click", () => { $("llista-av").append(targetaAvantatge({ tipus: "per_temporada", limit_usos: 1 })); $("llista-av").lastChild.querySelector("input[required]").focus(); });

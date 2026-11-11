@@ -75,6 +75,47 @@ Deno.serve(async (req) => {
       const { error } = await db.from("usos").delete().eq("amic_id", String(b.amic_id)).eq("avantatge_id", av.id);
       if (error) return json({ error: "DB" }, 500);
     }
+  } else if (["atura_renovacio", "baixa", "valid_fins", "esborra"].includes(accio)) {
+    // Gestió d'un Amic. Si té subscripció a Stripe, primer s'hi aplica el canvi: si Stripe falla, no es toca res.
+    const { data: am } = await db.from("amics").select("id, estat, stripe_subscription_id").eq("id", String(b.amic_id)).maybeSingle();
+    if (!am) return json({ error: "AMIC" }, 404);
+    const key = Deno.env.get("STRIPE_SECRET_KEY");
+    const stripe = async (method: string, cos?: URLSearchParams) => {
+      if (!am.stripe_subscription_id) return true;
+      if (!key) return false;
+      const r = await fetch(`https://api.stripe.com/v1/subscriptions/${am.stripe_subscription_id}`, {
+        method, headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/x-www-form-urlencoded" }, body: cos,
+      });
+      if (r.ok || r.status === 404) return true; // 404: ja no existeix a Stripe
+      const e = await r.json().catch(() => ({}));
+      if (e?.error?.code === "resource_missing") return true;
+      console.error("stripe admin", r.status, e?.error?.message);
+      return false;
+    };
+    const { data: avui } = await db.rpc("avui_bcn");
+
+    if (accio === "atura_renovacio") {
+      if (!(await stripe("POST", new URLSearchParams({ cancel_at_period_end: "true" })))) return json({ error: "STRIPE" }, 502);
+      const { error } = await db.from("amics").update({ estat: "cancellat" }).eq("id", am.id);
+      if (error) return json({ error: "DB" }, 500);
+    } else if (accio === "baixa") {
+      // Baixa immediata: cancel·la la subscripció i el carnet caduca avui mateix
+      if (!(await stripe("DELETE"))) return json({ error: "STRIPE" }, 502);
+      const ahir = new Date(new Date(avui + "T12:00:00Z").getTime() - 86400000).toISOString().slice(0, 10);
+      const { error } = await db.from("amics").update({ estat: "caducat", valid_fins: ahir }).eq("id", am.id);
+      if (error) return json({ error: "DB" }, 500);
+    } else if (accio === "valid_fins") {
+      if (!esData(b.valid_fins)) return json({ error: "DIA" }, 400);
+      // Manté la renovació si en té; si no, queda actiu sense renovació fins a la data indicada
+      const estat = am.estat === "actiu" && am.stripe_subscription_id ? "actiu" : "cancellat";
+      const { error } = await db.from("amics").update({ valid_fins: b.valid_fins, estat }).eq("id", am.id);
+      if (error) return json({ error: "DB" }, 500);
+    } else {
+      // Esborra l'Amic i tots els seus registres. No es pot desfer.
+      if (!(await stripe("DELETE"))) return json({ error: "STRIPE" }, 502);
+      const { error } = await db.from("amics").delete().eq("id", am.id);
+      if (error) return json({ error: "DB" }, 500);
+    }
   } else if (accio !== "llista") {
     return json({ error: "ACCIO" }, 400);
   }
@@ -85,11 +126,12 @@ Deno.serve(async (req) => {
     .select("id, codi, nom, descripcio, icona, tipus, limit_usos, actiu, ordre").order("ordre").order("nom");
   const { data: dies } = await db.from("dies_marcats").select("avantatge_id, dia, nota").gte("dia", avui).order("dia");
   const { data: amics } = await db.from("amics")
-    .select("id, num, nom, email, mobil, talla, estat, valid_fins, created_at").neq("estat", "pendent").order("num");
+    .select("id, num, nom, email, mobil, talla, estat, valid_fins, created_at, stripe_subscription_id").neq("estat", "pendent").order("num");
+  const amicsNet = (amics ?? []).map(({ stripe_subscription_id, ...a }) => ({ ...a, te_subscripcio: !!stripe_subscription_id }));
   const unics = (avantatges ?? []).filter((a) => a.tipus === "unic").map((a) => a.id);
   const { data: usos } = unics.length
     ? await db.from("usos").select("amic_id, avantatge_id, dia").in("avantatge_id", unics)
     : { data: [] };
 
-  return json({ admin: p.nom, avui, avantatges, dies, amics, usos });
+  return json({ admin: p.nom, avui, avantatges, dies, amics: amicsNet, usos });
 });
